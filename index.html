@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Månedens Mand</title>
+<style>
+:root{--bg:#fff7e6;--card:#fff;--ink:#1d1a2f;--mute:#6b6684;--acc:#ff4f81;--acc2:#6c4cff;--star:#ffb300;--off:#ddd6ee;--line:#1d1a2f;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17142a;--card:#241f40;--ink:#fff7e6;--mute:#a9a3c8;--off:#3a3463;--line:#fff7e6}}
+:root[data-theme="dark"]{--bg:#17142a;--card:#241f40;--ink:#fff7e6;--mute:#a9a3c8;--off:#3a3463;--line:#fff7e6}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Trebuchet MS","Comic Sans MS",system-ui,sans-serif;min-height:100%;padding:16px}
+main{max-width:760px;margin:0 auto}
+h1{font-size:clamp(28px,7vw,46px);line-height:1;margin:8px 0 4px;transform:rotate(-1.5deg)}
+h1 span{color:var(--acc)}
+.sub{color:var(--mute);margin:0 0 16px}
+.who{background:var(--acc2);color:#fff;border:3px solid var(--line);border-radius:16px;padding:12px;margin-bottom:16px;box-shadow:4px 4px 0 var(--line)}
+.who b{display:block;margin-bottom:8px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font:inherit;border:2px solid var(--line);background:#fff;color:#1d1a2f;border-radius:999px;padding:6px 12px;cursor:pointer;font-weight:700}
+.chip.on{background:var(--star)}
+.board{background:var(--card);border:3px solid var(--line);border-radius:16px;padding:12px;margin-bottom:16px;box-shadow:4px 4px 0 var(--line)}
+.board h2{margin:0 0 8px;font-size:18px}
+.row{display:flex;justify-content:space-between;gap:8px;padding:4px 0;border-bottom:2px dashed var(--off)}
+.row:last-child{border:0}
+.card{background:var(--card);border:3px solid var(--line);border-radius:18px;padding:14px;margin-bottom:16px;box-shadow:5px 5px 0 var(--line)}
+.card:nth-child(odd){transform:rotate(.4deg)}.card:nth-child(even){transform:rotate(-.4deg)}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap}
+.mon{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--acc)}
+.host{font-size:22px;font-weight:900;margin:2px 0}
+.badge{background:var(--star);color:#1d1a2f;border:2px solid var(--line);border-radius:12px;padding:4px 10px;font-weight:900;white-space:nowrap}
+.title{font-size:19px;font-weight:800;margin:8px 0 2px}
+.meta{color:var(--mute);font-size:14px}
+.empty{color:var(--mute);font-style:italic;margin:8px 0}
+.stars{display:flex;gap:2px;margin-top:10px;align-items:center;flex-wrap:wrap}
+.s{font-size:34px;line-height:1;cursor:pointer;background:none;border:0;padding:0 2px;color:var(--off);transition:transform .1s}
+.s:hover{transform:scale(1.25) rotate(8deg)}
+.s.on{color:var(--star)}
+.note{font-size:13px;color:var(--mute);margin-left:6px}
+button.act,.act{font:inherit;font-weight:800;background:var(--acc);color:#fff;border:2px solid var(--line);border-radius:12px;padding:8px 14px;cursor:pointer;box-shadow:2px 2px 0 var(--line)}
+form-like{display:block}
+.f{display:grid;gap:8px;margin-top:10px}
+.f input,.f textarea{font:inherit;color:var(--ink);background:var(--bg);border:2px solid var(--line);border-radius:10px;padding:8px;width:100%}
+.voters{font-size:13px;color:var(--mute);margin-top:6px}
+.warn{background:#fff3b0;color:#4a3b00;border:2px solid var(--line);border-radius:12px;padding:8px 12px;margin-bottom:12px;font-size:14px}
+.hide{display:none}
+</style>
+</head>
+<body>
+<main>
+<h1>🏆 Månedens <span>Mand</span> 🏆</h1>
+<p class="sub">Én mand om måneden. Alle andre dømmer. Ingen nåde.</p>
+<div id="warn" class="warn hide"></div>
+<div class="who"><b>Hvem er du?</b><div class="chips" id="chips"></div></div>
+<div class="board"><h2>🏅 Ranglisten</h2><div id="board"></div></div>
+<div id="list"></div>
+</main>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, collection, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+// ===== INDSÆT DINE FIREBASE-VÆRDIER HER (Project settings > Din web-app) =====
+const firebaseConfig = {
+  apiKey: "DIN_API_KEY",
+  authDomain: "DIT_PROJEKT.firebaseapp.com",
+  projectId: "DIT_PROJEKT",
+  appId: "DIT_APP_ID"
+};
+// ==============================================================================
+
+const SCHEDULE=[
+ {id:"2026-09",m:"September",host:"Gaarde"},
+ {id:"2026-10",m:"Oktober",host:"Pico"},
+ {id:"2026-11",m:"November",host:"Noah"},
+ {id:"2026-12",m:"December",host:"Capper"},
+ {id:"2027-01",m:"Januar",host:"Oliver"},
+ {id:"2027-02",m:"Februar",host:"Migu"}
+];
+const NAMES=SCHEDULE.map(s=>s.host);
+let me=null,events={},ratings={},db=null,editing=null;
+try{me=localStorage.getItem("fest-me")}catch(e){}
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const dat=d=>{try{return typeof d.data==="function"?d.data():d.data}catch(e){return {}}};
+
+function avg(id){const r=Object.values(ratings).filter(x=>x.event===id);if(!r.length)return null;return {a:r.reduce((s,x)=>s+x.stars,0)/r.length,n:r.length}}
+
+function render(){
+ $("chips").innerHTML=NAMES.map(n=>`<button class="chip ${n===me?"on":""}" data-n="${n}">${n}</button>`).join("");
+ const rank=SCHEDULE.map(s=>({s,v:avg(s.id)})).filter(x=>x.v).sort((a,b)=>b.v.a-a.v.a);
+ $("board").innerHTML=rank.length?rank.map((x,i)=>`<div class="row"><span>${["🥇","🥈","🥉"][i]||(i+1)+"."} ${esc(x.s.host)} – ${esc((events[x.s.id]||{}).title||x.s.m)}</span><b>${x.v.a.toFixed(1)} ⭐</b></div>`).join(""):'<div class="empty">Ingen stemmer endnu... hvem tør åbne?</div>';
+ $("list").innerHTML=SCHEDULE.map(s=>{
+  const e=events[s.id],v=avg(s.id),mine=ratings[s.id+"_"+me],isHost=me===s.host;
+  let h=`<div class="card"><div class="top"><div><div class="mon">${s.m}</div><div class="host">${esc(s.host)}</div></div>${v?`<div class="badge">${v.a.toFixed(1)} ⭐ (${v.n})</div>`:""}</div>`;
+  if(editing===s.id){
+   h+=`<div class="f"><input id="t" placeholder="Hvad skal vi lave?" value="${esc(e&&e.title)}"><input id="d" placeholder="Dato (fx fredag d. 14. november kl. 19)" value="${esc(e&&e.date)}"><div><button class="act" data-save="${s.id}">Gem 🔥</button> <button class="chip" data-cancel>Annuller</button></div></div>`;
+  }else if(e&&e.title){
+   h+=`<div class="title">${esc(e.title)}</div><div class="meta">📅 ${esc(e.date||"Dato følger")}</div>`;
+   if(isHost)h+=`<p><button class="chip" data-edit="${s.id}">✏️ Ret</button></p>`;
+  }else{
+   h+=`<div class="empty">${isHost?"Du har ikke meldt noget ind endnu!":"Intet meldt ind endnu 👀"}</div>`;
+   if(isHost)h+=`<button class="act" data-edit="${s.id}">Meld dit arrangement ind</button>`;
+  }
+  if(e&&e.title&&editing!==s.id){
+   if(!me)h+=`<div class="note">Vælg dit navn øverst for at stemme</div>`;
+   else if(isHost)h+=`<div class="note">Du kan ikke stemme på dig selv 😏</div>`;
+   else h+=`<div class="stars">${[1,2,3,4,5].map(n=>`<button class="s ${mine&&mine.stars>=n?"on":""}" data-r="${s.id}" data-v="${n}" aria-label="${n} stjerner">★</button>`).join("")}<span class="note">${mine?"Du gav "+mine.stars+"/5":"Hvor sjovt var det?"}</span></div>`;
+   const who=Object.values(ratings).filter(x=>x.event===s.id).map(x=>x.rater+" "+x.stars+"★");
+   if(who.length)h+=`<div class="voters">${esc(who.join(" · "))}</div>`;
+  }
+  return h+"</div>";
+ }).join("");
+}
+
+document.addEventListener("click",async ev=>{
+ const t=ev.target.closest("button");if(!t)return;
+ if(t.dataset.n){me=t.dataset.n;try{localStorage.setItem("fest-me",me)}catch(e){}render()}
+ else if(t.dataset.edit){editing=t.dataset.edit;render()}
+ else if(t.hasAttribute("data-cancel")){editing=null;render()}
+ else if(t.dataset.save){
+  const id=t.dataset.save,s=SCHEDULE.find(x=>x.id===id);
+  const doc={month:s.m,host:s.host,title:$("t").value.trim(),date:$("d").value.trim()};
+  if(!doc.title)return;
+  events[id]=doc;editing=null;render();await write("events",id,doc);
+ }else if(t.dataset.r){
+  const id=t.dataset.r,v=+t.dataset.v,key=id+"_"+me,doc={event:id,rater:me,stars:v};
+  ratings[key]=doc;render();await write("ratings",key,doc);
+ }
+});
+async function write(col,id,data){
+ if(!db){warn("Firebase er ikke sat op endnu - ændringer deles ikke.");return}
+ try{await setDoc(doc(db,col,id),data)}
+ catch(e){warn("Kunne ikke gemme. Tjek Firestore-reglerne.");console.error(e)}
+}
+function warn(m){const w=$("warn");w.textContent=m;w.classList.remove("hide")}
+
+render();
+if(firebaseConfig.apiKey==="DIN_API_KEY"){
+ warn("Firebase er ikke sat op endnu - indsæt dine værdier i firebaseConfig.");
+}else{
+ try{
+  db=getFirestore(initializeApp(firebaseConfig));
+  onSnapshot(collection(db,"events"),s=>{events={};s.forEach(d=>events[d.id]=d.data());render()});
+  onSnapshot(collection(db,"ratings"),s=>{ratings={};s.forEach(d=>ratings[d.id]=d.data());render()});
+ }catch(e){warn("Kunne ikke forbinde til Firebase.");console.error(e)}
+}
+</script>
+</body>
+</html>
